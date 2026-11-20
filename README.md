@@ -1,2 +1,67 @@
-# GPS-tool-new
-Offline-first Android GPS toolbox for Redmi K70 / Android 16. Kotlin + Compose; built entirely with GitHub Actions.
+# GPS Tool New / GPS 工具箱
+
+个人使用、离线优先的 Android GPS 工具箱。**速度是首页主视觉**，估计水平精度位于下方信息卡。
+
+- 主要适配目标：红米 K70 / Android 16 / HyperOS 3
+- 支持安装：Android 12（API 31）及以上；云端验收针对 Android 16（API 36）
+- Kotlin 2.2.21 / Jetpack Compose / Room / DataStore / LocationManager
+- 所有构建与测试在 GitHub 托管 Actions 运行器执行；不需要本地 Android 环境
+
+## 安装
+
+在 [Releases](https://github.com/Meteorsss/GPS-tool-new/releases) 下载 APK。源码 ZIP 不是安装包。初次安装允许所使用的文件管理器或浏览器安装未知应用；首次运行按需授予精确定位、通知权限。
+
+## 功能
+
+| 页面 | 功能 |
+|---|---|
+| 总览 | 大号速度仪表、估计水平精度、GNSS 椭球高度、坐标、卫星计数、复制分享、保存位置 |
+| 卫星 | 天空图、载噪比、星座筛选、参与定位、可用时显示载波频率 |
+| 轨迹 | 开始/暂停/继续/结束、前台服务、Room 逐点存储、历史统计、分段轨迹预览、GPX/CSV 导出 |
+| 工具 | 指南针、收藏、目标直线方向、坐标距离、GeoJSON 导出、定位与后台诊断 |
+
+设置中可选择深色、浅色（户外）或跟随系统。不提供在线地图、道路路线、模拟位置、导入恢复、云同步或精度增强。
+
+## 数据真实性
+
+- 没有速度数据时显示 —，不会假装为 0。定位过期 10 秒后隐藏实时速度和方向。
+- 水平精度是系统估计半径，不是真实误差的实测值。
+- 高度来自 GNSS WGS84 椭球基准，不冒充海拔。
+- 所有收到的记录点都保留于 CSV，低精度、模拟点、疑似跳点不计入里程。GPX 导出连续合格段。
+- 主动暂停、长于 20 秒的采样缺口和拒绝点会断段，避免跨越缺口连线。
+- 距离经过基础漂移过滤，不能保证测绘精度；短距离慢行可能低估，噪声也可能造成残余偏差。
+- 异常退出后保留已写入点，下次启动将未完成记录标为异常中断。不假装恢复了未收到的点。
+
+## 隐私
+
+应用没有 INTERNET 权限，不自建服务器、无账号、无广告和统计 SDK。真实位置、收藏、轨迹只保存在手机应用私有数据库。系统云备份禁用，数据提取规则排除云备份及设备迁移。主动导出、复制、分享和打开外部地图会把所选数据交给用户选择的目标应用。Android 系统定位本身的网络行为由系统控制。
+
+卸载将清除数据库。请先导出数据。导出文件包含精确位置；本版没有导入恢复界面。
+
+## 云端编译
+
+打开 Actions → Android build, test and release → Run workflow。输入版本号，选择是否在通过所有测试后发布 Release。普通 main 分支代码提交也触发构建、测试，但不自动发布。
+
+- JDK 17、Gradle 8.13、AGP 8.13.2、Android SDK 36。
+- Actions 依赖固定到提交 SHA。
+- 构建作业执行 JVM 单元测试、Android Lint、R8 release 构建和签名验证。
+- Android 16 x86_64 模拟器执行 Compose 操作、前台记录启停、Room 数据保存/级联删除测试，并保存界面截图。
+- Release 仅在构建与模拟器检查都成功后发布。
+- APK、SHA256SUMS.txt 和 signature.txt 作为产物。
+
+## 签名
+
+签名私钥在 GitHub 云端一次性生成，通过仓库公钥加密后存入 Actions Secrets：
+
+- ANDROID_KEYSTORE_BASE64
+- ANDROID_KEYSTORE_PASSWORD
+
+私钥不在源码中、不作为产物公开。证书 SHA-256：
+
+`5e3aaec69a37f7e7d4d0b0509a0bc0994852732b9a7f03ceb060b742d4e08983`
+
+**不要删除或随意替换 Secrets。** 正常覆盖升级需要保持包名与签名一致、versionCode 递增。Secrets 无法通过 API 读取回来；当前签名材料仅保存在仓库 Secrets，独立加密离线备份应由仓库所有者另行安排，本项目没有把私钥以明文或公开产物形式导出。签名 bootstrap 工作流发现已配置密钥会拒绝重复生成。
+
+## 红米 K70 实机验收
+
+参见 [验收清单](docs/ACCEPTANCE.md)。云端模拟器通过不等于已经验证 K70 的卫星、传感器、定位精度、耗电、系统回收或 HyperOS 后台策略。
