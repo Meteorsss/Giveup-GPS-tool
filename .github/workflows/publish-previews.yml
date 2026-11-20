@@ -1,0 +1,43 @@
+name: Publish emulator screenshots
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Android test run ID
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: android-16-test-reports
+          path: preview-input
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+      - name: Commit only emulator screenshots
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, pathlib, shutil
+          images = glob.glob('preview-input/**/screenshots/*.png', recursive=True)
+          if not images:
+              raise RuntimeError('No screenshots found')
+          target = pathlib.Path('docs/screenshots')
+          target.mkdir(parents=True, exist_ok=True)
+          for image in images:
+              shutil.copyfile(image, target / pathlib.Path(image).name)
+          (target / 'README.md').write_text('Android 16 emulator screenshots. Synthetic emulator location only, not Redmi K70 measurements. Source Actions run: ' + os.environ['RUN_ID'] + '\n', encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/screenshots
+          git diff --cached --quiet || git commit -m "docs: publish Android 16 emulator screenshots"
+          git push origin HEAD:main
