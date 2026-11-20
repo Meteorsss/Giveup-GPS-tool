@@ -140,7 +140,7 @@ class RecordingService : Service() {
         app.engine.setRecording(false)
         app.recording.value = null
         if (!cleanStop && unfinished != null) app.scope.launch {
-            app.db.dao().updateTrack(unfinished.copy(state = "interrupted", endedAt = System.currentTimeMillis(), durationMs = duration()))
+            runCatching { app.db.dao().updateTrack(unfinished.copy(state = "interrupted", endedAt = System.currentTimeMillis(), durationMs = duration())) }
         }
         super.onDestroy()
     }

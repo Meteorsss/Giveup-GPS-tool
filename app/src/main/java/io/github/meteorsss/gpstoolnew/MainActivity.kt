@@ -11,6 +11,8 @@ import androidx.activity.compose.*
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -81,8 +83,9 @@ class MainActivity : ComponentActivity() {
     var busyExport by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { while (true) { now = SystemClock.elapsedRealtimeNanos(); delay(1000) } }
-    LaunchedEffect(message) { message?.let { app.message.value = null; snackbar.showSnackbar(it) } }
-    val permission = app.engine.hasPermission()
+    LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); if (app.message.value == it) app.message.value = null } }
+    val uiHeartbeat = now
+    val permission = remember(uiHeartbeat) { app.engine.hasPermission() }
     val fresh = permission && enabled && fix?.let { now - it.elapsedNanos in 0L..10_000_000_000L } == true
     val notifications = activity.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
     val batteryExempt = activity.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(activity.packageName)
@@ -139,6 +142,13 @@ class MainActivity : ComponentActivity() {
         return (if (fresh) "当前位置" else "最后一次位置（已过期）") + " · WGS84\n纬度 " + Geo.decimal(current.latitude, 6) + "\n经度 " + Geo.decimal(current.longitude, 6) + "\n时间 " + dateText(current.time) + "\n估计水平精度 " + Geo.decimal(current.accuracy, 0) + " m"
     }
     ToolboxTheme(theme) {
+        val darkBars = theme == "dark" || (theme == "system" && isSystemInDarkTheme())
+        SideEffect {
+            WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
+                isAppearanceLightStatusBars = !darkBars
+                isAppearanceLightNavigationBars = !darkBars
+            }
+        }
         Scaffold(
             topBar = { TopAppBar(title = { Column { Text("GPS 工具箱", fontWeight = FontWeight.SemiBold, fontSize = 21.sp); Text("GPS TOOL NEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 2.sp) } },
                 actions = { TextButton(onClick = { showSettings = true }, modifier = Modifier.testTag("open-settings")) { Text("设置") } }) },

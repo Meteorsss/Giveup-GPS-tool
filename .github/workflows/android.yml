@@ -50,11 +50,15 @@ jobs:
           test -n "$KEYSTORE_B64"
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
           chmod 600 "$RUNNER_TEMP/release.jks"
+      - name: Check JUnit repository availability
+        run: |
+          curl --fail --retry 3 -I https://repo.maven.apache.org/maven2/junit/junit/4.13.2/junit-4.13.2.pom || true
+          curl --fail --retry 3 -I https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.pom || true
       - name: Test, lint and build release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: gradle --no-daemon --stacktrace -PappVersion="$APP_VERSION" -PbuildNumber="$GITHUB_RUN_NUMBER" :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
+        run: gradle --no-daemon --refresh-dependencies --stacktrace -PappVersion="$APP_VERSION" -PbuildNumber="$GITHUB_RUN_NUMBER" :app:testDebugUnitTest :app:lintRelease :app:assembleRelease
       - name: Verify APK signature and prepare delivery
         run: |
           mkdir -p dist
