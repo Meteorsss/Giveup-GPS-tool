@@ -1,0 +1,58 @@
+name: Bootstrap signing key (one-time)
+on:
+  workflow_dispatch:
+    inputs:
+      public_key:
+        description: GitHub repository Actions secrets public key (base64)
+        required: true
+        type: string
+      confirmation:
+        description: Type CREATE_FIRST_KEY; do not rotate an installed app key
+        required: true
+        type: string
+permissions: {}
+jobs:
+  generate:
+    if: inputs.confirmation == 'CREATE_FIRST_KEY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refuse accidental key replacement
+        env:
+          EXISTING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$EXISTING_KEY" ]; then
+            echo "Signing key already configured; refusing rotation."
+            exit 1
+          fi
+      - name: Install encryption helper on hosted runner
+        run: |
+          python3 -m venv "$RUNNER_TEMP/sign-tools"
+          "$RUNNER_TEMP/sign-tools/bin/pip" install --disable-pip-version-check PyNaCl==1.5.0
+      - name: Generate key and publish only sealed secret values
+        env:
+          REPOSITORY_PUBLIC_KEY: ${{ inputs.public_key }}
+        run: |
+          "$RUNNER_TEMP/sign-tools/bin/python" - <<'PY'
+          import base64, hashlib, json, os, secrets, subprocess, tempfile
+          from nacl.public import PublicKey, SealedBox
+          public_key = PublicKey(base64.b64decode(os.environ['REPOSITORY_PUBLIC_KEY']))
+          box = SealedBox(public_key)
+          password = secrets.token_hex(32)
+          print('::add-mask::' + password, flush=True)
+          with tempfile.TemporaryDirectory() as directory:
+              path = os.path.join(directory, 'release.jks')
+              subprocess.run(['keytool', '-genkeypair', '-noprompt', '-keystore', path,
+                  '-storetype', 'JKS', '-storepass', password, '-keypass', password,
+                  '-alias', 'gps-tool-new', '-keyalg', 'RSA', '-keysize', '3072',
+                  '-validity', '36500', '-dname', 'CN=GPS Tool New'], check=True, capture_output=True)
+              cert = subprocess.check_output(['keytool', '-exportcert', '-keystore', path,
+                  '-storepass', password, '-alias', 'gps-tool-new'])
+              with open(path, 'rb') as stream:
+                  key = base64.b64encode(stream.read()).decode()
+              values = {'ANDROID_KEYSTORE_BASE64': key, 'ANDROID_KEYSTORE_PASSWORD': password}
+              encrypted = {name: base64.b64encode(box.encrypt(value.encode())).decode()
+                           for name, value in values.items()}
+              print('GPS_SIGNING_SEALED=' + json.dumps(encrypted, separators=(',', ':')), flush=True)
+              print('SIGNING_CERT_SHA256=' + hashlib.sha256(cert).hexdigest(), flush=True)
+          PY
