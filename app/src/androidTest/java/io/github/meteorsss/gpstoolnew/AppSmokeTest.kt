@@ -2,6 +2,8 @@ package io.github.meteorsss.gpstoolnew
 
 import android.Manifest
 import android.graphics.Bitmap
+import android.content.ContentValues
+import android.provider.MediaStore
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,9 +18,17 @@ class AppSmokeTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val file = File(instrumentation.targetContext.getExternalFilesDir(null), "screenshots/" + name + ".png")
-        file.parentFile!!.mkdirs()
-        instrumentation.uiAutomation.takeScreenshot().let { image -> file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }; image.recycle() }
+        val resolver = instrumentation.targetContext.contentResolver
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name + ".png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/GPS-Tool-New-test")
+        }
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
+        instrumentation.uiAutomation.takeScreenshot().let { image ->
+            resolver.openOutputStream(uri)!!.use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            image.recycle()
+        }
     }
     @Test fun fourTabsAndForegroundRecordingWork() {
         compose.onNodeWithTag("hero-speed").assertExists()
